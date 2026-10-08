@@ -1,2 +1,3 @@
-﻿BOT_TOKEN = "8954702825:AAFcfjSEZXnfTKkm2wTgYBjl1-y4T3rgXJM"
+﻿# Локальные значения (на Render будут перезаписаны переменными окружения)
+BOT_TOKEN = "ТВОЙ_ТОКЕН_ТУТ"
 SITE_URL = "http://localhost:8000"
