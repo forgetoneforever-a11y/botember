@@ -1,0 +1,2 @@
+﻿BOT_TOKEN = "8954702825:AAFcfjSEZXnfTKkm2wTgYBjl1-y4T3rgXJM"
+SITE_URL = "http://localhost:8000"
