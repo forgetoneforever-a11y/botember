@@ -1,4 +1,7 @@
-﻿import asyncio
+cd $HOME\Desktop\ember\bot
+
+@'
+import asyncio
 import os
 from flask import Flask
 from aiogram import Bot, Dispatcher, types
@@ -8,12 +11,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Настройки ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-# URL сайта, который мы получим от Render (для локального теста можно localhost)
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
-# --- Flask (для Render) ---
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не найден в переменных окружения!")
+
+# --- Flask для Render ---
 app = Flask(__name__)
 
 @app.route("/")
@@ -40,12 +44,18 @@ async def cmd_start(message: types.Message):
     )
 
 async def run_bot():
+    print("🤖 Запускаю Telegram-бота...")
     await dp.start_polling(bot)
 
+def start_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
 if __name__ == "__main__":
-    # Запускаем бота в фоне
-    loop = asyncio.get_event_loop()
-    loop.create_task(run_bot())
-    # Запускаем Flask (это нужно для Render)
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    # Запускаем Flask в отдельном потоке
+    import threading
+    threading.Thread(target=start_flask, daemon=True).start()
+    
+    # Запускаем бота в главном потоке (это правильно для Python 3.12)
+    asyncio.run(run_bot())
+'@ | Out-File -FilePath bot.py -Encoding UTF8
