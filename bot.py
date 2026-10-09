@@ -24,7 +24,7 @@ SPONSOR_CHANNEL = "emberbot_love"
 # Ссылка на правила
 RULES_URL = "https://telegra.ph/Pravila-ispolzovaniya-Ember-10-09"
 
-# file_id картинки для меню "Поддержка"
+# file_id картинки для меню и поддержки
 SUPPORT_IMAGE = "AgACAgEAAxkBAAIBjGrIxjlMV2Z2zXBLmQZT443yIy45AALNDGsbh7pIRug9wLP31WJlAQADAgADeAADPQQ"
 
 if not BOT_TOKEN:
@@ -149,10 +149,27 @@ async def cmd_start(message: types.Message):
         )
         return
 
-    await message.answer(
+    # 👇 ОТПРАВКА С КАРТИНКОЙ
+    caption = (
         "Привет! 👋\n\n"
         "Это бот знакомств <b>Ember</b>.\n"
-        "Нажми на кнопку ниже, чтобы начать 💕",
+        "Нажми на кнопку ниже, чтобы начать 💕"
+    )
+
+    if SUPPORT_IMAGE:
+        try:
+            await message.answer_photo(
+                photo=SUPPORT_IMAGE,
+                caption=caption,
+                reply_markup=main_menu_keyboard(),
+                parse_mode="HTML"
+            )
+            return
+        except Exception as e:
+            print(f"⚠️ Не удалось отправить картинку: {e}")
+
+    await message.answer(
+        caption,
         reply_markup=main_menu_keyboard(),
         parse_mode="HTML"
     )
