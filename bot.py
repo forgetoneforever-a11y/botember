@@ -24,10 +24,9 @@ SPONSOR_CHANNEL = "emberbot_love"
 # Ссылка на правила
 RULES_URL = "https://telegra.ph/Pravila-ispolzovaniya-Ember-10-09"
 
-# 👇 file_id картинки для меню "Поддержка"
-# Отправь картинку боту (от своего аккаунта-админа) — бот покажет file_id
-# Вставь его сюда (вместо None)
-SUPPORT_IMAGE = None
+# file_id картинок
+SUPPORT_IMAGE = "AgACAgEAAxkBAAIBjGrIxjlMV2Z2zXBLmQZT443yIy45AALNDGsbh7pIRug9wLP31WJlAQADAgADeAADPQQ"
+ACTION_IMAGE = "AgACAgEAAxkBAAIBnmrIyQ2DJBPIgz5iRkpqNXPan5TiAALODGsbh7pIRvAD3kOrHHUdAQADAgADeAADPQQ"
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден!")
@@ -121,6 +120,13 @@ def main_menu_keyboard():
     ])
 
 
+def action_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 Поддержка", callback_data="start_support")],
+        [InlineKeyboardButton(text="🔥 Открыть Ember", web_app=WebAppInfo(url=SITE_URL))]
+    ])
+
+
 # ============ КОМАНДЫ ============
 
 @dp.message(Command("start"))
@@ -151,10 +157,26 @@ async def cmd_start(message: types.Message):
         )
         return
 
-    await message.answer(
+    caption = (
         "Привет! 👋\n\n"
         "Это бот знакомств <b>Ember</b>.\n"
-        "Нажми на кнопку ниже, чтобы начать 💕",
+        "Нажми на кнопку ниже, чтобы начать 💕"
+    )
+
+    if SUPPORT_IMAGE:
+        try:
+            await message.answer_photo(
+                photo=SUPPORT_IMAGE,
+                caption=caption,
+                reply_markup=main_menu_keyboard(),
+                parse_mode="HTML"
+            )
+            return
+        except Exception as e:
+            print(f"⚠️ Не удалось отправить картинку: {e}")
+
+    await message.answer(
+        caption,
         reply_markup=main_menu_keyboard(),
         parse_mode="HTML"
     )
@@ -294,16 +316,6 @@ async def cmd_stop(message: types.Message):
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
 
-    # 👇 ЛОГИРОВАНИЕ FILE_ID (только для админа)
-    if user_id == ADMIN_ID and message.photo:
-        file_id = message.photo[-1].file_id
-        print(f"📸 FILE_ID: {file_id}")
-        await message.answer(
-            f"📸 <b>file_id картинки:</b>\n\n<code>{file_id}</code>",
-            parse_mode="HTML"
-        )
-        return
-
     # 1. Админ отвечает на поддержку
     if user_id == ADMIN_ID and str(pending_support.get(ADMIN_ID, "")).startswith("reply_to_"):
         target_user_id = int(pending_support[ADMIN_ID].replace("reply_to_", ""))
@@ -396,12 +408,24 @@ async def handle_message(message: types.Message):
             else:
                 await message.answer(f"❌ Ошибка: {error_text}")
     else:
+        # 👇 МЕНЮ "ВЫБЕРИ ДЕЙСТВИЕ" С КАРТИНКОЙ
+        action_caption = "Выбери действие:"
+
+        if ACTION_IMAGE:
+            try:
+                await message.answer_photo(
+                    photo=ACTION_IMAGE,
+                    caption=action_caption,
+                    reply_markup=action_keyboard(),
+                    parse_mode="HTML"
+                )
+                return
+            except Exception as e:
+                print(f"⚠️ Не удалось отправить картинку: {e}")
+
         await message.answer(
-            "Выбери действие:",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="💬 Поддержка", callback_data="start_support")],
-                [InlineKeyboardButton(text="🔥 Открыть Ember", web_app=WebAppInfo(url=SITE_URL))]
-            ])
+            action_caption,
+            reply_markup=action_keyboard()
         )
 
 
