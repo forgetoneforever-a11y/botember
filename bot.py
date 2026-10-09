@@ -24,6 +24,11 @@ SPONSOR_CHANNEL = "emberbot_love"
 # Ссылка на правила
 RULES_URL = "https://telegra.ph/Pravila-ispolzovaniya-Ember-10-09"
 
+# 👇 file_id картинки для меню "Поддержка"
+# Отправь картинку боту @userinfobot — он покажет file_id
+# Затем вставь его сюда (вместо None)
+SUPPORT_IMAGE = None
+
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден!")
 
@@ -40,8 +45,6 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 active_chats = {}
-
-# Хранилища для поддержки
 pending_support = {}
 
 _name_cache = {}
@@ -113,7 +116,6 @@ async def send_subscribe_message(message_or_callback):
 def main_menu_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔥 Открыть Ember", web_app=WebAppInfo(url=SITE_URL))],
-        [InlineKeyboardButton(text="💬 Мои чаты", callback_data="list_chats")],
         [InlineKeyboardButton(text="💬 Поддержка", callback_data="start_support")],
         [InlineKeyboardButton(text="📜 Правила и конфиденциальность", url=RULES_URL)]
     ])
@@ -138,14 +140,12 @@ async def cmd_start(message: types.Message):
         partner_name = get_user_name(partner_id)
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Закрыть чат", callback_data="close_chat")],
-            [InlineKeyboardButton(text="💬 Все мои чаты", callback_data="list_chats")]
+            [InlineKeyboardButton(text="❌ Закрыть чат", callback_data="close_chat")]
         ])
 
         await message.answer(
             f"💬 <b>Чат с {partner_name} открыт!</b>\n\n"
-            f"Напиши сообщение — я передам его.\n"
-            f"Переключиться на другой чат — /chats",
+            f"Напиши сообщение — я передам его.",
             reply_markup=keyboard,
             parse_mode="HTML"
         )
@@ -187,14 +187,32 @@ async def start_support_flow(message: types.Message):
         [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_support")]
     ])
 
-    await message.answer(
+    caption = (
         "💬 <b>Поддержка Ember</b>\n\n"
         "Напиши своё сообщение одним текстом. Это может быть:\n\n"
         "• 💡 Идея или предложение\n"
         "• 🐞 Сообщение об ошибке\n"
         "• ❓ Вопрос\n"
         "• ⚠️ Жалоба на пользователя\n\n"
-        "<i>Администрация прочитает и ответит.</i>",
+        "<i>Администрация прочитает и ответит.</i>"
+    )
+
+    # Если file_id картинки задан — отправляем с картинкой
+    if SUPPORT_IMAGE:
+        try:
+            await message.answer_photo(
+                photo=SUPPORT_IMAGE,
+                caption=caption,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            return
+        except Exception as e:
+            print(f"⚠️ Не удалось отправить картинку: {e}")
+
+    # Иначе — только текст
+    await message.answer(
+        caption,
         reply_markup=keyboard,
         parse_mode="HTML"
     )
@@ -229,77 +247,6 @@ async def cb_reply_support(callback: types.CallbackQuery):
 
 # ============ ЧАТЫ ============
 
-@dp.message(Command("chats"))
-async def cmd_chats(message: types.Message):
-    user_id = message.from_user.id
-
-    if not await is_subscribed(user_id):
-        await send_subscribe_message(message)
-        return
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT u.telegram_id, u.name, u.age
-            FROM users u
-            WHERE u.telegram_id IN (
-                SELECT CASE 
-                    WHEN l1.from_user = %s THEN l1.to_user
-                    ELSE l1.from_user
-                END
-                FROM likes l1
-                INNER JOIN likes l2 
-                    ON l1.from_user = l2.to_user 
-                    AND l1.to_user = l2.from_user
-                WHERE (l1.from_user = %s OR l1.to_user = %s)
-                    AND l1.is_like = TRUE 
-                    AND l2.is_like = TRUE
-            )
-        """, (str(user_id), str(user_id), str(user_id)))
-        matches = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        if not matches:
-            await message.answer(
-                "💔 У тебя пока нет мэтчей.",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🔥 Открыть Ember", web_app=WebAppInfo(url=SITE_URL))]
-                ])
-            )
-            return
-
-        keyboard_buttons = []
-        for match in matches:
-            partner_id, name, age = match
-            prefix = "⭐ " if active_chats.get(user_id) == str(partner_id) else "💬 "
-            keyboard_buttons.append([
-                InlineKeyboardButton(text=f"{prefix}{name}, {age}", callback_data=f"open_chat_{partner_id}")
-            ])
-
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="❌ Закрыть активный чат", callback_data="close_chat")
-        ])
-
-        await message.answer(
-            f"💬 <b>Твои чаты ({len(matches)})</b>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        print(f"Ошибка: {e}")
-
-
-@dp.callback_query(lambda c: c.data == "list_chats")
-async def cb_list_chats(callback: types.CallbackQuery):
-    if not await is_subscribed(callback.from_user.id):
-        await callback.answer("❌ Ты не подписан!", show_alert=True)
-        return
-    await callback.answer()
-    await cmd_chats(callback.message)
-
-
 @dp.callback_query(lambda c: c.data.startswith("open_chat_"))
 async def cb_open_chat(callback: types.CallbackQuery):
     if not await is_subscribed(callback.from_user.id):
@@ -314,7 +261,6 @@ async def cb_open_chat(callback: types.CallbackQuery):
     await callback.message.answer(
         f"💬 <b>Чат с {partner_name} открыт!</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💬 Все мои чаты", callback_data="list_chats")],
             [InlineKeyboardButton(text="❌ Закрыть чат", callback_data="close_chat")]
         ]),
         parse_mode="HTML"
@@ -341,7 +287,7 @@ async def cmd_stop(message: types.Message):
         del active_chats[message.from_user.id]
         await message.answer("❌ Чат закрыт.")
     else:
-        await message.answer("У тебя нет активного чата. Используй /chats.")
+        await message.answer("У тебя нет активного чата.")
 
 
 # ============ ОБРАБОТКА СООБЩЕНИЙ ============
@@ -445,7 +391,6 @@ async def handle_message(message: types.Message):
         await message.answer(
             "Выбери действие:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="💬 Мои чаты", callback_data="list_chats")],
                 [InlineKeyboardButton(text="💬 Поддержка", callback_data="start_support")],
                 [InlineKeyboardButton(text="🔥 Открыть Ember", web_app=WebAppInfo(url=SITE_URL))]
             ])
@@ -470,7 +415,6 @@ async def run_bot():
 
     await bot.set_my_commands([
         types.BotCommand(command="/start", description="🚀 Открыть Ember"),
-        types.BotCommand(command="/chats", description="💬 Мои чаты"),
         types.BotCommand(command="/support", description="💬 Поддержка"),
         types.BotCommand(command="/rules", description="📜 Правила"),
         types.BotCommand(command="/stop", description="❌ Закрыть чат"),
