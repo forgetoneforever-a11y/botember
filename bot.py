@@ -149,7 +149,7 @@ async def cmd_start(message: types.Message):
         )
         return
 
-    # 👇 ОТПРАВКА С КАРТИНКОЙ
+    # Отправка с картинкой
     caption = (
         "Привет! 👋\n\n"
         "Это бот знакомств <b>Ember</b>.\n"
