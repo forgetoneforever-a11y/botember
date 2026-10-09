@@ -24,8 +24,10 @@ SPONSOR_CHANNEL = "emberbot_love"
 # Ссылка на правила
 RULES_URL = "https://telegra.ph/Pravila-ispolzovaniya-Ember-10-09"
 
-# file_id картинки для меню и поддержки
-SUPPORT_IMAGE = "AgACAgEAAxkBAAIBjGrIxjlMV2Z2zXBLmQZT443yIy45AALNDGsbh7pIRug9wLP31WJlAQADAgADeAADPQQ"
+# 👇 file_id картинки для меню "Поддержка"
+# Отправь картинку боту (от своего аккаунта-админа) — бот покажет file_id
+# Вставь его сюда (вместо None)
+SUPPORT_IMAGE = None
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден!")
@@ -149,27 +151,10 @@ async def cmd_start(message: types.Message):
         )
         return
 
-    # Отправка с картинкой
-    caption = (
+    await message.answer(
         "Привет! 👋\n\n"
         "Это бот знакомств <b>Ember</b>.\n"
-        "Нажми на кнопку ниже, чтобы начать 💕"
-    )
-
-    if SUPPORT_IMAGE:
-        try:
-            await message.answer_photo(
-                photo=SUPPORT_IMAGE,
-                caption=caption,
-                reply_markup=main_menu_keyboard(),
-                parse_mode="HTML"
-            )
-            return
-        except Exception as e:
-            print(f"⚠️ Не удалось отправить картинку: {e}")
-
-    await message.answer(
-        caption,
+        "Нажми на кнопку ниже, чтобы начать 💕",
         reply_markup=main_menu_keyboard(),
         parse_mode="HTML"
     )
@@ -308,6 +293,16 @@ async def cmd_stop(message: types.Message):
 @dp.message()
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
+
+    # 👇 ЛОГИРОВАНИЕ FILE_ID (только для админа)
+    if user_id == ADMIN_ID and message.photo:
+        file_id = message.photo[-1].file_id
+        print(f"📸 FILE_ID: {file_id}")
+        await message.answer(
+            f"📸 <b>file_id картинки:</b>\n\n<code>{file_id}</code>",
+            parse_mode="HTML"
+        )
+        return
 
     # 1. Админ отвечает на поддержку
     if user_id == ADMIN_ID and str(pending_support.get(ADMIN_ID, "")).startswith("reply_to_"):
