@@ -25,8 +25,8 @@ SPONSOR_CHANNEL = "emberbot_love"
 RULES_URL = "https://telegra.ph/Pravila-ispolzovaniya-Ember-10-09"
 
 # 👇 file_id картинки для меню "Поддержка"
-# Отправь картинку боту @userinfobot — он покажет file_id
-# Затем вставь его сюда (вместо None)
+# Отправь картинку боту (от своего аккаунта-админа) — бот покажет file_id
+# Вставь его сюда (вместо None)
 SUPPORT_IMAGE = None
 
 if not BOT_TOKEN:
@@ -197,7 +197,6 @@ async def start_support_flow(message: types.Message):
         "<i>Администрация прочитает и ответит.</i>"
     )
 
-    # Если file_id картинки задан — отправляем с картинкой
     if SUPPORT_IMAGE:
         try:
             await message.answer_photo(
@@ -210,7 +209,6 @@ async def start_support_flow(message: types.Message):
         except Exception as e:
             print(f"⚠️ Не удалось отправить картинку: {e}")
 
-    # Иначе — только текст
     await message.answer(
         caption,
         reply_markup=keyboard,
@@ -295,6 +293,16 @@ async def cmd_stop(message: types.Message):
 @dp.message()
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
+
+    # 👇 ЛОГИРОВАНИЕ FILE_ID (только для админа)
+    if user_id == ADMIN_ID and message.photo:
+        file_id = message.photo[-1].file_id
+        print(f"📸 FILE_ID: {file_id}")
+        await message.answer(
+            f"📸 <b>file_id картинки:</b>\n\n<code>{file_id}</code>",
+            parse_mode="HTML"
+        )
+        return
 
     # 1. Админ отвечает на поддержку
     if user_id == ADMIN_ID and str(pending_support.get(ADMIN_ID, "")).startswith("reply_to_"):
