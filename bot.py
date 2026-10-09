@@ -18,6 +18,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # Канал-спонсор (без @)
 SPONSOR_CHANNEL = "emberbot_love"
 
+# Ссылка на правила и политику конфиденциальности
+RULES_URL = "https://telegra.ph/Pravila-ispolzovaniya-Ember-10-09"
+
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден!")
 
@@ -72,16 +75,16 @@ def get_user_name(user_id):
 async def is_subscribed(user_id):
     """Проверка подписки на канал-спонсор"""
     try:
+        print(f"🔍 Проверка подписки: user={user_id} на @{SPONSOR_CHANNEL}")
         member = await bot.get_chat_member(chat_id=f"@{SPONSOR_CHANNEL}", user_id=user_id)
-        print(f"Проверка подписки {user_id}: {member.status}")
+        print(f"✅ Статус: {member.status}")
         return member.status in ["member", "administrator", "creator"]
     except Exception as e:
-        print(f"Ошибка проверки подписки: {e}")
+        print(f"❌ Ошибка проверки: {type(e).__name__}: {e}")
         return False
 
 
 def subscribe_keyboard():
-    """Клавиатура с кнопками подписки"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="📢 Подписаться на канал",
@@ -90,18 +93,22 @@ def subscribe_keyboard():
         [InlineKeyboardButton(
             text="✅ Я подписался",
             callback_data="check_subscription"
+        )],
+        [InlineKeyboardButton(
+            text="📜 Правила и конфиденциальность",
+            url=RULES_URL
         )]
     ])
 
 
 async def send_subscribe_message(message_or_callback):
-    """Отправить сообщение о необходимости подписки"""
     text = (
         "🔒 <b>Доступ закрыт</b>\n\n"
         "Чтобы пользоваться ботом <b>Ember</b>, "
         "нужно подписаться на наш канал.\n\n"
         f"📢 Канал: @{SPONSOR_CHANNEL}\n\n"
-        "После подписки нажми <b>«Я подписался»</b> 👇"
+        "После подписки нажми <b>«Я подписался»</b> 👇\n\n"
+        "📜 <i>Используя бота, ты соглашаешься с правилами и политикой конфиденциальности.</i>"
     )
 
     if isinstance(message_or_callback, types.CallbackQuery):
@@ -125,18 +132,33 @@ async def send_subscribe_message(message_or_callback):
         )
 
 
+def main_menu_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="🔥 Открыть Ember",
+            web_app=WebAppInfo(url=SITE_URL)
+        )],
+        [InlineKeyboardButton(
+            text="💬 Мои чаты",
+            callback_data="list_chats"
+        )],
+        [InlineKeyboardButton(
+            text="📜 Правила и конфиденциальность",
+            url=RULES_URL
+        )]
+    ])
+
+
 # ============ КОМАНДЫ ============
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
 
-    # Проверяем подписку
     if not await is_subscribed(user_id):
         await send_subscribe_message(message)
         return
 
-    # Проверка параметра chat_<id>
     args = message.text.split()
     if len(args) > 1 and args[1].startswith("chat_"):
         partner_id = args[1].replace("chat_", "")
@@ -157,24 +179,27 @@ async def cmd_start(message: types.Message):
         )
         return
 
-    # Обычное /start
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="🔥 Открыть Ember",
-            web_app=WebAppInfo(url=SITE_URL)
-        )],
-        [InlineKeyboardButton(
-            text="💬 Мои чаты",
-            callback_data="list_chats"
-        )]
-    ])
-
     await message.answer(
         "Привет! 👋\n\n"
         "Это бот знакомств <b>Ember</b>.\n"
         "Нажми на кнопку ниже, чтобы начать 💕",
-        reply_markup=keyboard,
+        reply_markup=main_menu_keyboard(),
         parse_mode="HTML"
+    )
+
+
+@dp.message(Command("rules"))
+async def cmd_rules(message: types.Message):
+    if not await is_subscribed(message.from_user.id):
+        await send_subscribe_message(message)
+        return
+
+    await message.answer(
+        "📜 <b>Правила и конфиденциальность Ember</b>\n\n"
+        f"Читай тут: {RULES_URL}\n\n"
+        "<i>Используя бота, ты соглашаешься с этими правилами.</i>",
+        parse_mode="HTML",
+        disable_web_page_preview=False
     )
 
 
@@ -185,23 +210,11 @@ async def cb_check_subscription(callback: types.CallbackQuery):
     if await is_subscribed(user_id):
         await callback.answer("✅ Спасибо за подписку!")
 
-        # Показываем обычное меню
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text="🔥 Открыть Ember",
-                web_app=WebAppInfo(url=SITE_URL)
-            )],
-            [InlineKeyboardButton(
-                text="💬 Мои чаты",
-                callback_data="list_chats"
-            )]
-        ])
-
         await callback.message.edit_text(
             "✅ <b>Подписка подтверждена!</b>\n\n"
             "Добро пожаловать в <b>Ember</b> 💕\n"
             "Нажми на кнопку ниже, чтобы начать:",
-            reply_markup=keyboard,
+            reply_markup=main_menu_keyboard(),
             parse_mode="HTML"
         )
     else:
@@ -343,7 +356,6 @@ async def cmd_stop(message: types.Message):
 async def forward_message(message: types.Message):
     user_id = message.from_user.id
 
-    # Проверка подписки при любом сообщении
     if not await is_subscribed(user_id):
         await send_subscribe_message(message)
         return
@@ -379,22 +391,20 @@ async def forward_message(message: types.Message):
             if "chat not found" in error_text:
                 await message.answer(
                     "❌ Не удалось отправить.\n\n"
-                    "Твой собеседник ещё не запускал бота @Emberanon_bot.\n"
-                    "Попроси его открыть бота и нажать /start."
+                    "Твой собеседник ещё не запускал бота @Emberanon_bot."
                 )
             else:
                 await message.answer(f"❌ Ошибка: {error_text}")
     else:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💬 Мои чаты", callback_data="list_chats")],
-            [InlineKeyboardButton(
-                text="🔥 Открыть Ember",
-                web_app=WebAppInfo(url=SITE_URL)
-            )]
-        ])
         await message.answer(
             "Выбери чат, чтобы написать сообщение:",
-            reply_markup=keyboard
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💬 Мои чаты", callback_data="list_chats")],
+                [InlineKeyboardButton(
+                    text="🔥 Открыть Ember",
+                    web_app=WebAppInfo(url=SITE_URL)
+                )]
+            ])
         )
 
 
@@ -404,6 +414,7 @@ async def run_bot():
     await bot.set_my_commands([
         types.BotCommand(command="/start", description="🚀 Открыть Ember"),
         types.BotCommand(command="/chats", description="💬 Мои чаты"),
+        types.BotCommand(command="/rules", description="📜 Правила и конфиденциальность"),
         types.BotCommand(command="/stop", description="❌ Закрыть активный чат"),
     ])
 
